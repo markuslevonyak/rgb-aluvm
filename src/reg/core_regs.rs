@@ -392,7 +392,7 @@ impl CoreRegs {
         idx1: impl Into<RegS>,
         idx2: impl Into<RegS>,
     ) -> Option<(&ByteStr, &ByteStr)> {
-        self.s16(idx1).and_then(|val1| self.s16(idx2).map(|val2| (val1, val2)))
+        self.s16(idx1).zip(self.s16(idx2))
     }
 
     /// Assigns the provided value to the register bit-wise. Silently discards most significant bits
