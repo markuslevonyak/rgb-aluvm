@@ -229,8 +229,8 @@ macro_rules! instr {
     };
 
     (clr $reg:ident[$idx:literal]) => {
-        Instr::Put($crate::_reg_sfx!(PutOp, Clr, $reg)(
-            $crate::_reg_ty!(Reg, $reg),
+        Instr::Put($crate::_reg_sfx!(PutOp::ClrA, PutOp::ClrF, PutOp::ClrR, $reg)(
+            $crate::_reg_ty!($reg),
             $crate::_reg_idx!($idx),
         ))
     };
@@ -278,7 +278,7 @@ macro_rules! instr {
     (len s16[$s_idx:literal], $rega:ident[$rega_idx:literal]) => {{
         Instr::Bytes(BytesOp::Len(
             RegS::from($s_idx),
-            $crate::_reg_tya!(Reg, $rega),
+            $crate::_reg_tya!($rega),
             $crate::_reg_idx!($rega_idx),
         ))
     }};
@@ -310,22 +310,27 @@ macro_rules! instr {
     (put $reg:ident[$idx:literal], $val:literal) => {{
         let s = stringify!($val);
         let mut num = s.parse::<MaybeNumber>().expect(&format!("invalid number literal `{}`", s));
-        let reg = $crate::_reg_ty!(Reg, $reg);
+        let reg = $crate::_reg_ty!($reg);
         num.reshape(reg.layout());
-        Instr::Put($crate::_reg_sfx!(PutOp, Put, $reg)(reg, $crate::_reg_idx!($idx), Box::new(num)))
+        Instr::Put($crate::_reg_sfx!(PutOp::PutA, PutOp::PutF, PutOp::PutR, $reg)(reg, $crate::_reg_idx!($idx), Box::new(num)))
     }};
     (put $reg:ident[$idx:literal], $val:ident) => {{
         let mut num = MaybeNumber::from($val);
-        let reg = $crate::_reg_ty!(Reg, $reg);
+        let reg = $crate::_reg_ty!($reg);
         num.reshape(reg.layout());
-        Instr::Put($crate::_reg_sfx!(PutOp, Put, $reg)(reg, $crate::_reg_idx!($idx), Box::new(num)))
+        Instr::Put($crate::_reg_sfx!(PutOp::PutA, PutOp::PutF, PutOp::PutR, $reg)(reg, $crate::_reg_idx!($idx), Box::new(num)))
     }};
     (putif $reg:ident[$idx:literal], $val:literal) => {{
         let s = stringify!($val);
         let mut num = s.parse::<MaybeNumber>().expect(&format!("invalid number literal `{}`", s));
-        let reg = $crate::_reg_ty!(Reg, $reg);
+        let reg = $crate::_reg_ty!($reg);
         num.reshape(reg.layout());
-        Instr::Put($crate::_reg_sfx!(PutOp, PutIf, $reg)(
+        Instr::Put($crate::_reg_sfx!(
+            PutOp::PutIfA,
+            compile_error!("`putif` operation is not supported for `F` registers"),
+            PutOp::PutIfR,
+            $reg
+        )(
             reg,
             $crate::_reg_idx!($idx),
             Box::new(num),
@@ -333,9 +338,14 @@ macro_rules! instr {
     }};
     (putif $reg:ident[$idx:literal], $val:ident) => {{
         let mut num = MaybeNumber::from($val);
-        let reg = $crate::_reg_ty!(Reg, $reg);
+        let reg = $crate::_reg_ty!($reg);
         num.reshape(reg.layout());
-        Instr::Put($crate::_reg_sfx!(PutOp, PutIf, $reg)(
+        Instr::Put($crate::_reg_sfx!(
+            PutOp::PutIfA,
+            compile_error!("`putif` operation is not supported for `F` registers"),
+            PutOp::PutIfR,
+            $reg
+        )(
             reg,
             $crate::_reg_idx!($idx),
             Box::new(num),
@@ -343,70 +353,80 @@ macro_rules! instr {
     }};
 
     (swp $reg1:ident[$idx1:literal], $reg2:ident[$idx2:literal]) => {{
-        if $crate::_reg_ty!(Reg, $reg1) != $crate::_reg_ty!(Reg, $reg2) {
+        if $crate::_reg_ty!($reg1) != $crate::_reg_ty!($reg2) {
             panic!("Swap operation must be performed between registers of the same type");
         }
-        Instr::Move($crate::_reg_sfx!(MoveOp, Swp, $reg1)(
-            $crate::_reg_ty!(Reg, $reg1),
+        Instr::Move($crate::_reg_sfx!(
+            MoveOp::SwpA,
+            MoveOp::SwpF,
+            compile_error!("`swp` operation is not supported for `R` registers"),
+            $reg1
+        )(
+            $crate::_reg_ty!($reg1),
             $crate::_reg_idx!($idx1),
             $crate::_reg_idx!($idx2),
         ))
     }};
     (mov $src_reg:ident[$src_idx:literal], $dst_reg:ident[$dst_idx:literal]) => {{
-        if $crate::_reg_ty!(Reg, $src_reg) != $crate::_reg_ty!(Reg, $dst_reg) {
+        if $crate::_reg_ty!($src_reg) != $crate::_reg_ty!($dst_reg) {
             panic!("Move operation must be performed between registers of the same type");
         }
-        Instr::Move($crate::_reg_sfx!(MoveOp, Mov, $src_reg)(
-            $crate::_reg_ty!(Reg, $src_reg),
+        Instr::Move($crate::_reg_sfx!(MoveOp::MovA, MoveOp::MovF, MoveOp::MovR, $src_reg)(
+            $crate::_reg_ty!($src_reg),
             $crate::_reg_idx!($src_idx),
             $crate::_reg_idx!($dst_idx),
         ))
     }};
     (dup $src_reg:ident[$src_idx:literal], $dst_reg:ident[$dst_idx:literal]) => {{
-        if $crate::_reg_ty!(Reg, $src_reg) != $crate::_reg_ty!(Reg, $dst_reg) {
+        if $crate::_reg_ty!($src_reg) != $crate::_reg_ty!($dst_reg) {
             panic!("Dup operation must be performed between registers of the same type");
         }
-        Instr::Move($crate::_reg_sfx!(MoveOp, Dup, $src_reg)(
-            $crate::_reg_ty!(Reg, $src_reg),
+        Instr::Move($crate::_reg_sfx!(MoveOp::DupA, MoveOp::DupF, MoveOp::DupR, $src_reg)(
+            $crate::_reg_ty!($src_reg),
             $crate::_reg_idx!($src_idx),
             $crate::_reg_idx!($dst_idx),
         ))
     }};
     (cpy $src_reg:ident[$src_idx:literal], $dst_reg:ident[$dst_idx:literal]) => {{
-        if $crate::_reg_ty!(Reg, $src_reg) != $crate::_reg_ty!(Reg, $dst_reg) {
+        if $crate::_reg_ty!($src_reg) != $crate::_reg_ty!($dst_reg) {
             panic!("Copy operation must be performed between registers of the same type");
         }
-        Instr::Move($crate::_reg_sfx!(MoveOp, Cpy, $src_reg)(
-            $crate::_reg_ty!(Reg, $src_reg),
+        Instr::Move($crate::_reg_sfx!(
+            MoveOp::CpyA,
+            compile_error!("`cpy` operation is not supported for `F` registers"),
+            MoveOp::CpyR,
+            $src_reg
+        )(
+            $crate::_reg_ty!($src_reg),
             $crate::_reg_idx!($src_idx),
-            $crate::_reg_ty!(Reg, $dst_reg),
+            $crate::_reg_ty!($dst_reg),
             $crate::_reg_idx!($dst_idx),
         ))
     }};
     (cnv $src_reg:ident[$src_idx:literal], $dst_reg:ident[$dst_idx:literal]) => {{
         match ($crate::_reg_block!($src_reg), $crate::_reg_block!($dst_reg)) {
             (RegBlockAFR::A, RegBlockAFR::F) => Instr::Move(MoveOp::CnvAF(
-                $crate::_reg_tya!(Reg, $src_reg),
+                $crate::_reg_tya!($src_reg),
                 $crate::_reg_idx!($src_idx),
-                $crate::_reg_tyf!(Reg, $dst_reg),
+                $crate::_reg_tyf!($dst_reg),
                 $crate::_reg_idx!($dst_idx),
             )),
             (RegBlockAFR::F, RegBlockAFR::A) => Instr::Move(MoveOp::CnvFA(
-                $crate::_reg_tyf!(Reg, $src_reg),
+                $crate::_reg_tyf!($src_reg),
                 $crate::_reg_idx!($src_idx),
-                $crate::_reg_tya!(Reg, $dst_reg),
+                $crate::_reg_tya!($dst_reg),
                 $crate::_reg_idx!($dst_idx),
             )),
             (RegBlockAFR::A, RegBlockAFR::A) => Instr::Move(MoveOp::CnvA(
-                $crate::_reg_tya!(Reg, $src_reg),
+                $crate::_reg_tya!($src_reg),
                 $crate::_reg_idx!($src_idx),
-                $crate::_reg_tya!(Reg, $dst_reg),
+                $crate::_reg_tya!($dst_reg),
                 $crate::_reg_idx!($dst_idx),
             )),
             (RegBlockAFR::F, RegBlockAFR::F) => Instr::Move(MoveOp::CnvF(
-                $crate::_reg_tyf!(Reg, $src_reg),
+                $crate::_reg_tyf!($src_reg),
                 $crate::_reg_idx!($src_idx),
-                $crate::_reg_tyf!(Reg, $dst_reg),
+                $crate::_reg_tyf!($dst_reg),
                 $crate::_reg_idx!($dst_idx),
             )),
             (_, _) => panic!("Conversion operation between unsupported register types"),
@@ -415,15 +435,15 @@ macro_rules! instr {
     (spy $src_reg:ident[$src_idx:literal], $dst_reg:ident[$dst_idx:literal]) => {{
         match ($crate::_reg_block!($src_reg), $crate::_reg_block!($dst_reg)) {
             (RegBlockAFR::A, RegBlockAFR::R) => Instr::Move(MoveOp::SpyAR(
-                $crate::_reg_tya!(Reg, $src_reg),
+                $crate::_reg_tya!($src_reg),
                 $crate::_reg_idx!($src_idx),
-                $crate::_reg_tyr!(Reg, $dst_reg),
+                $crate::_reg_tyr!($dst_reg),
                 $crate::_reg_idx!($dst_idx),
             )),
             (RegBlockAFR::R, RegBlockAFR::A) => Instr::Move(MoveOp::SpyAR(
-                $crate::_reg_tya!(Reg, $dst_reg),
+                $crate::_reg_tya!($dst_reg),
                 $crate::_reg_idx!($dst_idx),
-                $crate::_reg_tyr!(Reg, $src_reg),
+                $crate::_reg_tyr!($src_reg),
                 $crate::_reg_idx!($src_idx),
             )),
             (_, _) => {
@@ -440,7 +460,7 @@ macro_rules! instr {
             panic!("`gt` operation for arithmetic registers requires suffix");
         }
         Instr::Cmp(CmpOp::GtR(
-            $crate::_reg_tyr!(Reg, $reg1),
+            $crate::_reg_tyr!($reg1),
             $crate::_reg_idx!($idx1),
             $crate::_reg_idx!($idx2),
         ))
@@ -451,7 +471,7 @@ macro_rules! instr {
         }
         Instr::Cmp(CmpOp::GtA(
             SignFlag::Unsigned,
-            $crate::_reg_tya!(Reg, $reg1),
+            $crate::_reg_tya!($reg1),
             $crate::_reg_idx!($idx1),
             $crate::_reg_idx!($idx2),
         ))
@@ -462,7 +482,7 @@ macro_rules! instr {
         }
         Instr::Cmp(CmpOp::GtA(
             SignFlag::Signed,
-            $crate::_reg_tya!(Reg, $reg1),
+            $crate::_reg_tya!($reg1),
             $crate::_reg_idx!($idx1),
             $crate::_reg_idx!($idx2),
         ))
@@ -473,7 +493,7 @@ macro_rules! instr {
         }
         Instr::Cmp(CmpOp::GtF(
             FloatEqFlag::Exact,
-            $crate::_reg_tyf!(Reg, $reg1),
+            $crate::_reg_tyf!($reg1),
             $crate::_reg_idx!($idx1),
             $crate::_reg_idx!($idx2),
         ))
@@ -484,7 +504,7 @@ macro_rules! instr {
         }
         Instr::Cmp(CmpOp::GtF(
             FloatEqFlag::Rounding,
-            $crate::_reg_tyf!(Reg, $reg1),
+            $crate::_reg_tyf!($reg1),
             $crate::_reg_idx!($idx1),
             $crate::_reg_idx!($idx2),
         ))
@@ -497,7 +517,7 @@ macro_rules! instr {
             panic!("`lt` operation for arithmetic registers requires suffix");
         }
         Instr::Cmp(CmpOp::LtR(
-            $crate::_reg_tyr!(Reg, $reg1),
+            $crate::_reg_tyr!($reg1),
             $crate::_reg_idx!($idx1),
             $crate::_reg_idx!($idx2),
         ))
@@ -508,7 +528,7 @@ macro_rules! instr {
         }
         Instr::Cmp(CmpOp::LtA(
             SignFlag::Unsigned,
-            $crate::_reg_tya!(Reg, $reg1),
+            $crate::_reg_tya!($reg1),
             $crate::_reg_idx!($idx1),
             $crate::_reg_idx!($idx2),
         ))
@@ -519,7 +539,7 @@ macro_rules! instr {
         }
         Instr::Cmp(CmpOp::LtA(
             SignFlag::Signed,
-            $crate::_reg_tya!(Reg, $reg1),
+            $crate::_reg_tya!($reg1),
             $crate::_reg_idx!($idx1),
             $crate::_reg_idx!($idx2),
         ))
@@ -530,7 +550,7 @@ macro_rules! instr {
         }
         Instr::Cmp(CmpOp::LtF(
             FloatEqFlag::Exact,
-            $crate::_reg_tyf!(Reg, $reg1),
+            $crate::_reg_tyf!($reg1),
             $crate::_reg_idx!($idx1),
             $crate::_reg_idx!($idx2),
         ))
@@ -541,7 +561,7 @@ macro_rules! instr {
         }
         Instr::Cmp(CmpOp::LtF(
             FloatEqFlag::Rounding,
-            $crate::_reg_tyf!(Reg, $reg1),
+            $crate::_reg_tyf!($reg1),
             $crate::_reg_idx!($idx1),
             $crate::_reg_idx!($idx2),
         ))
@@ -555,19 +575,19 @@ macro_rules! instr {
         match $crate::_reg_block!($reg1) {
             RegBlockAFR::A => Instr::Cmp(CmpOp::EqA(
                 NoneEqFlag::Equal,
-                $crate::_reg_tya!(Reg, $reg1),
+                $crate::_reg_tya!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($idx2),
             )),
             RegBlockAFR::R => Instr::Cmp(CmpOp::EqR(
                 NoneEqFlag::Equal,
-                $crate::_reg_tyr!(Reg, $reg1),
+                $crate::_reg_tyr!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($idx2),
             )),
             RegBlockAFR::F => Instr::Cmp(CmpOp::EqF(
                 FloatEqFlag::Exact,
-                $crate::_reg_tyf!(Reg, $reg1),
+                $crate::_reg_tyf!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($idx2),
             )),
@@ -582,13 +602,13 @@ macro_rules! instr {
         match $crate::_reg_block!($reg1) {
             RegBlockAFR::A => Instr::Cmp(CmpOp::EqA(
                 NoneEqFlag::NonEqual,
-                $crate::_reg_tya!(Reg, $reg1),
+                $crate::_reg_tya!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($idx2),
             )),
             RegBlockAFR::R => Instr::Cmp(CmpOp::EqR(
                 NoneEqFlag::NonEqual,
-                $crate::_reg_tyr!(Reg, $reg1),
+                $crate::_reg_tyr!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($idx2),
             )),
@@ -603,7 +623,7 @@ macro_rules! instr {
         }
         Instr::Cmp(CmpOp::EqF(
             FloatEqFlag::Rounding,
-            $crate::_reg_tyf!(Reg, $reg1),
+            $crate::_reg_tyf!($reg1),
             $crate::_reg_idx!($idx1),
             $crate::_reg_idx!($idx2),
         ))
@@ -614,10 +634,10 @@ macro_rules! instr {
     (ifn $reg:ident[$idx:literal]) => {
         match $crate::_reg_block!($reg) {
             RegBlockAFR::A => {
-                Instr::Cmp(CmpOp::IfNA($crate::_reg_tya!(Reg, $reg), $crate::_reg_idx!($idx)))
+                Instr::Cmp(CmpOp::IfNA($crate::_reg_tya!($reg), $crate::_reg_idx!($idx)))
             }
             RegBlockAFR::R => {
-                Instr::Cmp(CmpOp::IfNR($crate::_reg_tyr!(Reg, $reg), $crate::_reg_idx!($idx)))
+                Instr::Cmp(CmpOp::IfNR($crate::_reg_tyr!($reg), $crate::_reg_idx!($idx)))
             }
             _ => panic!("Wrong registers for `ifn` operation"),
         }
@@ -625,10 +645,10 @@ macro_rules! instr {
     (ifz $reg:ident[$idx:literal]) => {
         match $crate::_reg_block!($reg) {
             RegBlockAFR::A => {
-                Instr::Cmp(CmpOp::IfZA($crate::_reg_tya!(Reg, $reg), $crate::_reg_idx!($idx)))
+                Instr::Cmp(CmpOp::IfZA($crate::_reg_tya!($reg), $crate::_reg_idx!($idx)))
             }
             RegBlockAFR::R => {
-                Instr::Cmp(CmpOp::IfZR($crate::_reg_tyr!(Reg, $reg), $crate::_reg_idx!($idx)))
+                Instr::Cmp(CmpOp::IfZR($crate::_reg_tyr!($reg), $crate::_reg_idx!($idx)))
             }
             _ => panic!("Wrong registers for `ifz` operation"),
         }
@@ -636,7 +656,7 @@ macro_rules! instr {
     (st. $flag:ident $reg:ident[$idx:literal]) => {
         Instr::Cmp(CmpOp::St(
             $crate::_merge_flag!($flag),
-            $crate::_reg_tya!(Reg, $reg),
+            $crate::_reg_tya!($reg),
             $crate::_reg_idx8!($idx),
         ))
     };
@@ -648,18 +668,18 @@ macro_rules! instr {
         match ($crate::_reg_block!($reg1), $crate::_reg_block!($dst_reg)) {
             (RegBlockAFR::A, RegBlockAFR::A) => Instr::Arithmetic(ArithmeticOp::AddA(
                 $crate::_int_flags!($flag),
-                $crate::_reg_tya!(Reg, $reg1),
+                $crate::_reg_tya!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($dst_idx),
             )),
             (RegBlockAFR::F, RegBlockAFR::F) => Instr::Arithmetic(ArithmeticOp::AddF(
                 $crate::_rounding_flag!($flag),
-                $crate::_reg_tyf!(Reg, $reg1),
+                $crate::_reg_tyf!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($dst_idx),
             )),
             (a, b) if a == b => panic!("addition requires integer or float registers"),
-            (_, _) if $crate::_reg_ty!(Reg, $reg1) != $crate::_reg_ty!(Reg, $dst_reg) => {
+            (_, _) if $crate::_reg_ty!($reg1) != $crate::_reg_ty!($dst_reg) => {
                 panic!("addition must be performed between registers of the same size")
             }
             (_, _) => panic!("addition must be performed between registers of the same type"),
@@ -669,18 +689,18 @@ macro_rules! instr {
         match ($crate::_reg_block!($reg1), $crate::_reg_block!($dst_reg)) {
             (RegBlockAFR::A, RegBlockAFR::A) => Instr::Arithmetic(ArithmeticOp::SubA(
                 $crate::_int_flags!($flag),
-                $crate::_reg_tya!(Reg, $reg1),
+                $crate::_reg_tya!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($dst_idx),
             )),
             (RegBlockAFR::F, RegBlockAFR::F) => Instr::Arithmetic(ArithmeticOp::SubF(
                 $crate::_rounding_flag!($flag),
-                $crate::_reg_tyf!(Reg, $reg1),
+                $crate::_reg_tyf!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($dst_idx),
             )),
             (a, b) if a == b => panic!("subtraction requires integer or float registers"),
-            (_, _) if $crate::_reg_ty!(Reg, $reg1) != $crate::_reg_ty!(Reg, $dst_reg) => {
+            (_, _) if $crate::_reg_ty!($reg1) != $crate::_reg_ty!($dst_reg) => {
                 panic!("subtraction must be performed between registers of the same size")
             }
             (_, _) => panic!("subtraction must be performed between registers of the same type"),
@@ -690,18 +710,18 @@ macro_rules! instr {
         match ($crate::_reg_block!($reg1), $crate::_reg_block!($dst_reg)) {
             (RegBlockAFR::A, RegBlockAFR::A) => Instr::Arithmetic(ArithmeticOp::MulA(
                 $crate::_int_flags!($flag),
-                $crate::_reg_tya!(Reg, $reg1),
+                $crate::_reg_tya!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($dst_idx),
             )),
             (RegBlockAFR::F, RegBlockAFR::F) => Instr::Arithmetic(ArithmeticOp::MulF(
                 $crate::_rounding_flag!($flag),
-                $crate::_reg_tyf!(Reg, $reg1),
+                $crate::_reg_tyf!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($dst_idx),
             )),
             (a, b) if a == b => panic!("multiplication requires integer or float registers"),
-            (_, _) if $crate::_reg_ty!(Reg, $reg1) != $crate::_reg_ty!(Reg, $dst_reg) => {
+            (_, _) if $crate::_reg_ty!($reg1) != $crate::_reg_ty!($dst_reg) => {
                 panic!("multiplication must be performed between registers of the same size")
             }
             (_, _) => panic!("multiplication must be performed between registers of the same type"),
@@ -711,18 +731,18 @@ macro_rules! instr {
         match ($crate::_reg_block!($reg1), $crate::_reg_block!($dst_reg)) {
             (RegBlockAFR::A, RegBlockAFR::A) => Instr::Arithmetic(ArithmeticOp::DivA(
                 $crate::_int_flags!($flag),
-                $crate::_reg_tya!(Reg, $reg1),
+                $crate::_reg_tya!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($dst_idx),
             )),
             (RegBlockAFR::F, RegBlockAFR::F) => Instr::Arithmetic(ArithmeticOp::DivF(
                 $crate::_rounding_flag!($flag),
-                $crate::_reg_tyf!(Reg, $reg1),
+                $crate::_reg_tyf!($reg1),
                 $crate::_reg_idx!($idx1),
                 $crate::_reg_idx!($dst_idx),
             )),
             (a, b) if a == b => panic!("division requires integer or float registers"),
-            (_, _) if $crate::_reg_ty!(Reg, $reg1) != $crate::_reg_ty!(Reg, $dst_reg) => {
+            (_, _) if $crate::_reg_ty!($reg1) != $crate::_reg_ty!($dst_reg) => {
                 panic!("division must be performed between registers of the same size")
             }
             (_, _) => panic!("division must be performed between registers of the same type"),
@@ -735,50 +755,50 @@ macro_rules! instr {
             panic!("modulo division must be performed only using integer arithmetic registers");
         } else {
             Instr::Arithmetic(ArithmeticOp::Rem(
-                $crate::_reg_tya!(Reg, $reg1),
+                $crate::_reg_tya!($reg1),
                 $crate::_reg_idx!($idx1),
-                $crate::_reg_tya!(Reg, $dst_reg),
+                $crate::_reg_tya!($dst_reg),
                 $crate::_reg_idx!($dst_idx),
             ))
         }
     };
     (inc $reg:ident[$idx:literal]) => {
         Instr::Arithmetic(ArithmeticOp::Stp(
-            $crate::_reg_tya!(Reg, $reg),
+            $crate::_reg_tya!($reg),
             $crate::_reg_idx!($idx),
             Step::with(1),
         ))
     };
     (add $reg:ident[$idx:literal], $step:literal) => {
         Instr::Arithmetic(ArithmeticOp::Stp(
-            $crate::_reg_tya!(Reg, $reg),
+            $crate::_reg_tya!($reg),
             $crate::_reg_idx!($idx),
             Step::with($step),
         ))
     };
     (dec $reg:ident[$idx:literal]) => {
         Instr::Arithmetic(ArithmeticOp::Stp(
-            $crate::_reg_tya!(Reg, $reg),
+            $crate::_reg_tya!($reg),
             $crate::_reg_idx!($idx),
             Step::with(-1),
         ))
     };
     (sub $reg:ident[$idx:literal], $step:literal) => {
         Instr::Arithmetic(ArithmeticOp::Stp(
-            $crate::_reg_tya!(Reg, $reg),
+            $crate::_reg_tya!($reg),
             $crate::_reg_idx!($idx),
             Step::with($step * -1),
         ))
     };
     (neg $reg:ident[$idx:literal]) => {
         Instr::Arithmetic(ArithmeticOp::Neg(
-            $crate::_reg_ty!(Reg, $reg).into(),
+            $crate::_reg_ty!($reg).into(),
             $crate::_reg_idx16!($idx),
         ))
     };
     (abs $reg:ident[$idx:literal]) => {
         Instr::Arithmetic(ArithmeticOp::Abs(
-            $crate::_reg_ty!(Reg, $reg).into(),
+            $crate::_reg_ty!($reg).into(),
             $crate::_reg_idx16!($idx),
         ))
     };
@@ -789,8 +809,8 @@ macro_rules! instr {
         $reg2:ident[$idx2:literal],
         $dst_reg:ident[$dst_idx:literal]
     ) => {
-        if $crate::_reg_ty!(Reg, $reg1) != $crate::_reg_ty!(Reg, $reg2)
-            || $crate::_reg_ty!(Reg, $reg2) != $crate::_reg_ty!(Reg, $dst_reg)
+        if $crate::_reg_ty!($reg1) != $crate::_reg_ty!($reg2)
+            || $crate::_reg_ty!($reg2) != $crate::_reg_ty!($dst_reg)
         {
             panic!("`and` operation must use the same type of registers for all of its operands");
         } else if $crate::_reg_block!($reg1) != RegBlockAFR::A
@@ -799,7 +819,7 @@ macro_rules! instr {
             panic!("`and` operation requires integer arithmetic or generic registers");
         } else {
             Instr::Bitwise(BitwiseOp::And(
-                $crate::_reg_ty!(Reg, $reg1).into(),
+                $crate::_reg_ty!($reg1).into(),
                 $crate::_reg_idx16!($idx1),
                 $crate::_reg_idx16!($idx2),
                 $crate::_reg_idx16!($dst_idx),
@@ -809,8 +829,8 @@ macro_rules! instr {
     (
         or $reg1:ident[$idx1:literal], $reg2:ident[$idx2:literal], $dst_reg:ident[$dst_idx:literal]
     ) => {
-        if $crate::_reg_ty!(Reg, $reg1) != $crate::_reg_ty!(Reg, $reg2)
-            || $crate::_reg_ty!(Reg, $reg2) != $crate::_reg_ty!(Reg, $dst_reg)
+        if $crate::_reg_ty!($reg1) != $crate::_reg_ty!($reg2)
+            || $crate::_reg_ty!($reg2) != $crate::_reg_ty!($dst_reg)
         {
             panic!("`or` operation must use the same type of registers for all of its operands");
         } else if $crate::_reg_block!($reg1) != RegBlockAFR::A
@@ -819,7 +839,7 @@ macro_rules! instr {
             panic!("`or` operation requires integer arithmetic or generic registers");
         } else {
             Instr::Bitwise(BitwiseOp::Or(
-                $crate::_reg_ty!(Reg, $reg1).into(),
+                $crate::_reg_ty!($reg1).into(),
                 $crate::_reg_idx16!($idx1),
                 $crate::_reg_idx16!($idx2),
                 $crate::_reg_idx16!($dst_idx),
@@ -832,8 +852,8 @@ macro_rules! instr {
         $reg2:ident[$idx2:literal],
         $dst_reg:ident[$dst_idx:literal]
     ) => {
-        if $crate::_reg_ty!(Reg, $reg1) != $crate::_reg_ty!(Reg, $reg2)
-            || $crate::_reg_ty!(Reg, $reg2) != $crate::_reg_ty!(Reg, $dst_reg)
+        if $crate::_reg_ty!($reg1) != $crate::_reg_ty!($reg2)
+            || $crate::_reg_ty!($reg2) != $crate::_reg_ty!($dst_reg)
         {
             panic!("`xor` operation must use the same type of registers for all of its operands");
         } else if $crate::_reg_block!($reg1) != RegBlockAFR::A
@@ -842,7 +862,7 @@ macro_rules! instr {
             panic!("`xor` operation requires integer arithmetic or generic registers");
         } else {
             Instr::Bitwise(BitwiseOp::Xor(
-                $crate::_reg_ty!(Reg, $reg1).into(),
+                $crate::_reg_ty!($reg1).into(),
                 $crate::_reg_idx16!($idx1),
                 $crate::_reg_idx16!($idx2),
                 $crate::_reg_idx16!($dst_idx),
@@ -851,62 +871,62 @@ macro_rules! instr {
     };
     (shl $reg1:ident[$idx1:literal], $reg2:ident[$idx2:literal]) => {
         Instr::Bitwise(BitwiseOp::Shl(
-            $crate::_reg_tya2!(Reg, $reg1),
+            $crate::_reg_tya2!($reg1),
             $crate::_reg_idx!($idx1),
-            $crate::_reg_ty!(Reg, $reg2).into(),
+            $crate::_reg_ty!($reg2).into(),
             $crate::_reg_idx!($idx2),
         ))
     };
     (shr.u $reg1:ident[$idx1:literal], $reg2:ident[$idx2:literal]) => {
         Instr::Bitwise(BitwiseOp::ShrA(
             SignFlag::Unsigned,
-            $crate::_reg_tya2!(Reg, $reg1),
+            $crate::_reg_tya2!($reg1),
             $crate::_reg_idx16!($idx1),
-            $crate::_reg_ty!(Reg, $reg2),
+            $crate::_reg_ty!($reg2),
             $crate::_reg_idx!($idx2),
         ))
     };
     (shr.s $reg1:ident[$idx1:literal], $reg2:ident[$idx2:literal]) => {
         Instr::Bitwise(BitwiseOp::ShrA(
             SignFlag::Signed,
-            $crate::_reg_tya2!(Reg, $reg1),
+            $crate::_reg_tya2!($reg1),
             $crate::_reg_idx16!($idx1),
-            $crate::_reg_ty!(Reg, $reg2),
+            $crate::_reg_ty!($reg2),
             $crate::_reg_idx!($idx2),
         ))
     };
     (shr $reg1:ident[$idx1:literal], $reg2:ident[$idx2:literal]) => {{
         Instr::Bitwise(BitwiseOp::ShrR(
-            $crate::_reg_tya2!(Reg, $reg1),
+            $crate::_reg_tya2!($reg1),
             $crate::_reg_idx!($idx1),
-            $crate::_reg_ty!(Reg, $reg2),
+            $crate::_reg_ty!($reg2),
             $crate::_reg_idx!($idx2),
         ))
     }};
     (scl $reg1:ident[$idx1:literal], $reg2:ident[$idx2:literal]) => {
         Instr::Bitwise(BitwiseOp::Scl(
-            $crate::_reg_tya2!(Reg, $reg1),
+            $crate::_reg_tya2!($reg1),
             $crate::_reg_idx!($idx1),
-            $crate::_reg_ty!(Reg, $reg2).into(),
+            $crate::_reg_ty!($reg2).into(),
             $crate::_reg_idx!($idx2),
         ))
     };
     (scr $reg1:ident[$idx1:literal], $reg2:ident[$idx2:literal]) => {
         Instr::Bitwise(BitwiseOp::Scr(
-            $crate::_reg_tya2!(Reg, $reg1),
+            $crate::_reg_tya2!($reg1),
             $crate::_reg_idx!($idx1),
-            $crate::_reg_ty!(Reg, $reg2).into(),
+            $crate::_reg_ty!($reg2).into(),
             $crate::_reg_idx!($idx2),
         ))
     };
     (rev $reg:ident[$idx:literal]) => {
         match $crate::_reg_block!($reg) {
             RegBlockAFR::A => Instr::Bitwise(BitwiseOp::RevA(
-                $crate::_reg_tya!(Reg, $reg),
+                $crate::_reg_tya!($reg),
                 $crate::_reg_idx!($idx),
             )),
             RegBlockAFR::R => Instr::Bitwise(BitwiseOp::RevR(
-                $crate::_reg_tyr!(Reg, $reg),
+                $crate::_reg_tyr!($reg),
                 $crate::_reg_idx!($idx),
             )),
             _ => panic!("Wrong registers for `rev` operation"),
@@ -941,7 +961,7 @@ macro_rules! instr {
         $src_reg:ident[$src_idx:literal],
         $dst_reg:ident[$dst_idx:literal]
     ) => {
-        if $crate::_reg_ty!(Reg, $src_reg) != $crate::_reg_ty!(Reg, $dst_reg) {
+        if $crate::_reg_ty!($src_reg) != $crate::_reg_ty!($dst_reg) {
             panic!("ecmul instruction can be used only with registers of the same type");
         } else {
             Instr::Secp256k1(Secp256k1Op::Mul(
@@ -1111,200 +1131,200 @@ macro_rules! _reg_block {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _reg_sfx {
-    ($a:ident, $b:ident,a8) => {
-        $crate::paste! { $a :: [<$b A>] }
+    ($a:expr, $f:expr, $r:expr,a8) => {
+        $a
     };
-    ($a:ident, $b:ident,a16) => {
-        $crate::paste! { $a :: [<$b A>] }
+    ($a:expr, $f:expr, $r:expr,a16) => {
+        $a
     };
-    ($a:ident, $b:ident,a32) => {
-        $crate::paste! { $a :: [<$b A>] }
+    ($a:expr, $f:expr, $r:expr,a32) => {
+        $a
     };
-    ($a:ident, $b:ident,a64) => {
-        $crate::paste! { $a :: [<$b A>] }
+    ($a:expr, $f:expr, $r:expr,a64) => {
+        $a
     };
-    ($a:ident, $b:ident,a128) => {
-        $crate::paste! { $a :: [<$b A>] }
+    ($a:expr, $f:expr, $r:expr,a128) => {
+        $a
     };
-    ($a:ident, $b:ident,a256) => {
-        $crate::paste! { $a :: [<$b A>] }
+    ($a:expr, $f:expr, $r:expr,a256) => {
+        $a
     };
-    ($a:ident, $b:ident,a512) => {
-        $crate::paste! { $a :: [<$b A>] }
+    ($a:expr, $f:expr, $r:expr,a512) => {
+        $a
     };
-    ($a:ident, $b:ident,a1024) => {
-        $crate::paste! { $a :: [<$b A>] }
-    };
-
-    ($a:ident, $b:ident,f16b) => {
-        $crate::paste! { $a :: [<$b F>] }
-    };
-    ($a:ident, $b:ident,f16) => {
-        $crate::paste! { $a :: [<$b F>] }
-    };
-    ($a:ident, $b:ident,f32) => {
-        $crate::paste! { $a :: [<$b F>] }
-    };
-    ($a:ident, $b:ident,f64) => {
-        $crate::paste! { $a :: [<$b F>] }
-    };
-    ($a:ident, $b:ident,f80) => {
-        $crate::paste! { $a :: [<$b F>] }
-    };
-    ($a:ident, $b:ident,f128) => {
-        $crate::paste! { $a :: [<$b F>] }
-    };
-    ($a:ident, $b:ident,f256) => {
-        $crate::paste! { $a :: [<$b F>] }
-    };
-    ($a:ident, $b:ident,f512) => {
-        $crate::paste! { $a :: [<$b F>] }
+    ($a:expr, $f:expr, $r:expr,a1024) => {
+        $a
     };
 
-    ($a:ident, $b:ident,r128) => {
-        $crate::paste! { $a :: [<$b R>] }
+    ($a:expr, $f:expr, $r:expr,f16b) => {
+        $f
     };
-    ($a:ident, $b:ident,r160) => {
-        $crate::paste! { $a :: [<$b R>] }
+    ($a:expr, $f:expr, $r:expr,f16) => {
+        $f
     };
-    ($a:ident, $b:ident,r256) => {
-        $crate::paste! { $a :: [<$b R>] }
+    ($a:expr, $f:expr, $r:expr,f32) => {
+        $f
     };
-    ($a:ident, $b:ident,r512) => {
-        $crate::paste! { $a :: [<$b R>] }
+    ($a:expr, $f:expr, $r:expr,f64) => {
+        $f
     };
-    ($a:ident, $b:ident,r1024) => {
-        $crate::paste! { $a :: [<$b R>] }
+    ($a:expr, $f:expr, $r:expr,f80) => {
+        $f
     };
-    ($a:ident, $b:ident,r2048) => {
-        $crate::paste! { $a :: [<$b R>] }
+    ($a:expr, $f:expr, $r:expr,f128) => {
+        $f
     };
-    ($a:ident, $b:ident,r4096) => {
-        $crate::paste! { $a :: [<$b R>] }
+    ($a:expr, $f:expr, $r:expr,f256) => {
+        $f
     };
-    ($a:ident, $b:ident,r8192) => {
-        $crate::paste! { $a :: [<$b R>] }
+    ($a:expr, $f:expr, $r:expr,f512) => {
+        $f
+    };
+
+    ($a:expr, $f:expr, $r:expr,r128) => {
+        $r
+    };
+    ($a:expr, $f:expr, $r:expr,r160) => {
+        $r
+    };
+    ($a:expr, $f:expr, $r:expr,r256) => {
+        $r
+    };
+    ($a:expr, $f:expr, $r:expr,r512) => {
+        $r
+    };
+    ($a:expr, $f:expr, $r:expr,r1024) => {
+        $r
+    };
+    ($a:expr, $f:expr, $r:expr,r2048) => {
+        $r
+    };
+    ($a:expr, $f:expr, $r:expr,r4096) => {
+        $r
+    };
+    ($a:expr, $f:expr, $r:expr,r8192) => {
+        $r
     };
 }
 
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _reg_ty {
-    ($ident:ident,a8) => {
-        $crate::paste! { [<$ident A>] :: A8 }
+    (a8) => {
+        RegA::A8
     };
-    ($ident:ident,a16) => {
-        $crate::paste! { [<$ident A>] :: A16 }
+    (a16) => {
+        RegA::A16
     };
-    ($ident:ident,a32) => {
-        $crate::paste! { [<$ident A>] :: A32 }
+    (a32) => {
+        RegA::A32
     };
-    ($ident:ident,a64) => {
-        $crate::paste! { [<$ident A>] :: A64 }
+    (a64) => {
+        RegA::A64
     };
-    ($ident:ident,a128) => {
-        $crate::paste! { [<$ident A>] :: A128 }
+    (a128) => {
+        RegA::A128
     };
-    ($ident:ident,a256) => {
-        $crate::paste! { [<$ident A>] :: A256 }
+    (a256) => {
+        RegA::A256
     };
-    ($ident:ident,a512) => {
-        $crate::paste! { [<$ident A>] :: A512 }
+    (a512) => {
+        RegA::A512
     };
-    ($ident:ident,a1024) => {
-        $crate::paste! { [<$ident A>] :: A1024 }
-    };
-
-    ($ident:ident,f16b) => {
-        $crate::paste! { [<$ident F>] :: F16B }
-    };
-    ($ident:ident,f16) => {
-        $crate::paste! { [<$ident F>] :: F16 }
-    };
-    ($ident:ident,f32) => {
-        $crate::paste! { [<$ident F>] :: F32 }
-    };
-    ($ident:ident,f64) => {
-        $crate::paste! { [<$ident F>] :: F64 }
-    };
-    ($ident:ident,f80) => {
-        $crate::paste! { [<$ident F>] :: F80 }
-    };
-    ($ident:ident,f128) => {
-        $crate::paste! { [<$ident F>] :: F128 }
-    };
-    ($ident:ident,f256) => {
-        $crate::paste! { [<$ident F>] :: F256 }
-    };
-    ($ident:ident,f512) => {
-        $crate::paste! { [<$ident F>] :: F512 }
+    (a1024) => {
+        RegA::A1024
     };
 
-    ($ident:ident,r128) => {
-        $crate::paste! { [<$ident R>] :: R128 }
+    (f16b) => {
+        RegF::F16B
     };
-    ($ident:ident,r160) => {
-        $crate::paste! { [<$ident R>] :: R160 }
+    (f16) => {
+        RegF::F16
     };
-    ($ident:ident,r256) => {
-        $crate::paste! { [<$ident R>] :: R256 }
+    (f32) => {
+        RegF::F32
     };
-    ($ident:ident,r512) => {
-        $crate::paste! { [<$ident R>] :: R512 }
+    (f64) => {
+        RegF::F64
     };
-    ($ident:ident,r1024) => {
-        $crate::paste! { [<$ident R>] :: R1024 }
+    (f80) => {
+        RegF::F80
     };
-    ($ident:ident,r2048) => {
-        $crate::paste! { [<$ident R>] :: R2048 }
+    (f128) => {
+        RegF::F128
     };
-    ($ident:ident,r4096) => {
-        $crate::paste! { [<$ident R>] :: R4096 }
+    (f256) => {
+        RegF::F256
     };
-    ($ident:ident,r8192) => {
-        $crate::paste! { [<$ident R>] :: R8192 }
+    (f512) => {
+        RegF::F512
+    };
+
+    (r128) => {
+        RegR::R128
+    };
+    (r160) => {
+        RegR::R160
+    };
+    (r256) => {
+        RegR::R256
+    };
+    (r512) => {
+        RegR::R512
+    };
+    (r1024) => {
+        RegR::R1024
+    };
+    (r2048) => {
+        RegR::R2048
+    };
+    (r4096) => {
+        RegR::R4096
+    };
+    (r8192) => {
+        RegR::R8192
     };
 }
 
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _reg_tya2 {
-    ($ident:ident,a8) => {
-        $crate::paste! { [<$ident A2>] :: A8 }
+    (a8) => {
+        RegA2::A8
     };
-    ($ident:ident,a16) => {
-        $crate::paste! { [<$ident A2>] :: A16 }
+    (a16) => {
+        RegA2::A16
     };
 }
 
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _reg_tya {
-    ($ident:ident,a8) => {
-        $crate::paste! { [<$ident A>] :: A8 }
+    (a8) => {
+        RegA::A8
     };
-    ($ident:ident,a16) => {
-        $crate::paste! { [<$ident A>] :: A16 }
+    (a16) => {
+        RegA::A16
     };
-    ($ident:ident,a32) => {
-        $crate::paste! { [<$ident A>] :: A32 }
+    (a32) => {
+        RegA::A32
     };
-    ($ident:ident,a64) => {
-        $crate::paste! { [<$ident A>] :: A64 }
+    (a64) => {
+        RegA::A64
     };
-    ($ident:ident,a128) => {
-        $crate::paste! { [<$ident A>] :: A128 }
+    (a128) => {
+        RegA::A128
     };
-    ($ident:ident,a256) => {
-        $crate::paste! { [<$ident A>] :: A256 }
+    (a256) => {
+        RegA::A256
     };
-    ($ident:ident,a512) => {
-        $crate::paste! { [<$ident A>] :: A512 }
+    (a512) => {
+        RegA::A512
     };
-    ($ident:ident,a1024) => {
-        $crate::paste! { [<$ident A>] :: A1024 }
+    (a1024) => {
+        RegA::A1024
     };
-    ($ident:ident, $other:ident) => {
+    ($other:ident) => {
         panic!("operation requires `A` register")
     };
 }
@@ -1312,31 +1332,31 @@ macro_rules! _reg_tya {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _reg_tyf {
-    ($ident:ident,f16b) => {
-        $crate::paste! { [<$ident F>] :: F16B }
+    (f16b) => {
+        RegF::F16B
     };
-    ($ident:ident,f16) => {
-        $crate::paste! { [<$ident F>] :: F16 }
+    (f16) => {
+        RegF::F16
     };
-    ($ident:ident,f32) => {
-        $crate::paste! { [<$ident F>] :: F32 }
+    (f32) => {
+        RegF::F32
     };
-    ($ident:ident,f64) => {
-        $crate::paste! { [<$ident F>] :: F64 }
+    (f64) => {
+        RegF::F64
     };
-    ($ident:ident,f80) => {
-        $crate::paste! { [<$ident F>] :: F80 }
+    (f80) => {
+        RegF::F80
     };
-    ($ident:ident,f128) => {
-        $crate::paste! { [<$ident F>] :: F128 }
+    (f128) => {
+        RegF::F128
     };
-    ($ident:ident,f256) => {
-        $crate::paste! { [<$ident F>] :: F256 }
+    (f256) => {
+        RegF::F256
     };
-    ($ident:ident,f512) => {
-        $crate::paste! { [<$ident F>] :: F512 }
+    (f512) => {
+        RegF::F512
     };
-    ($ident:ident, $other:ident) => {
+    ($other:ident) => {
         panic!("operation requires `F` register")
     };
 }
@@ -1344,31 +1364,31 @@ macro_rules! _reg_tyf {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _reg_tyr {
-    ($ident:ident,r128) => {
-        $crate::paste! { [<$ident R>] :: R128 }
+    (r128) => {
+        RegR::R128
     };
-    ($ident:ident,r160) => {
-        $crate::paste! { [<$ident R>] :: R160 }
+    (r160) => {
+        RegR::R160
     };
-    ($ident:ident,r256) => {
-        $crate::paste! { [<$ident R>] :: R256 }
+    (r256) => {
+        RegR::R256
     };
-    ($ident:ident,r512) => {
-        $crate::paste! { [<$ident R>] :: R512 }
+    (r512) => {
+        RegR::R512
     };
-    ($ident:ident,r1024) => {
-        $crate::paste! { [<$ident R>] :: R1024 }
+    (r1024) => {
+        RegR::R1024
     };
-    ($ident:ident,r2048) => {
-        $crate::paste! { [<$ident R>] :: R2048 }
+    (r2048) => {
+        RegR::R2048
     };
-    ($ident:ident,r4096) => {
-        $crate::paste! { [<$ident R>] :: R4096 }
+    (r4096) => {
+        RegR::R4096
     };
-    ($ident:ident,r8192) => {
-        $crate::paste! { [<$ident R>] :: R8192 }
+    (r8192) => {
+        RegR::R8192
     };
-    ($ident:ident, $other:ident) => {
+    ($other:ident) => {
         panic!("operation requires `R` register")
     };
 }
@@ -1430,25 +1450,31 @@ macro_rules! _reg_tyar {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _reg_idx {
-    ($idx:literal) => {
-        $crate::paste! { Reg32::[<Reg $idx>] }
-    };
+    ($idx:literal) => {{
+        // indexing a const array gives a compile-time error on out-of-range indexes
+        const IDX: Reg32 = Reg32::ALL[$idx];
+        IDX
+    }};
 }
 
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _reg_idx8 {
-    ($idx:literal) => {
-        $crate::paste! { Reg8::[<Reg $idx>] }
-    };
+    ($idx:literal) => {{
+        // indexing a const array gives a compile-time error on out-of-range indexes
+        const IDX: Reg8 = Reg8::ALL[$idx];
+        IDX
+    }};
 }
 
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _reg_idx16 {
-    ($idx:literal) => {
-        $crate::paste! { Reg16::[<Reg $idx>] }
-    };
+    ($idx:literal) => {{
+        // indexing a const array gives a compile-time error on out-of-range indexes
+        const IDX: Reg16 = Reg16::ALL[$idx];
+        IDX
+    }};
 }
 
 #[doc(hidden)]

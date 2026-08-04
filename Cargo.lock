@@ -669,7 +669,6 @@ dependencies = [
  "curve25519-dalek",
  "getrandom",
  "half",
- "paste",
  "rgb-ascii-armor",
  "rgb-strict-encoding",
  "rgb-strict-types",

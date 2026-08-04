@@ -168,8 +168,6 @@ mod vm;
 pub use isa::Isa;
 #[cfg(feature = "ascii-armor")]
 pub use library::LibArmorError;
-#[doc(hidden)]
-pub use paste::paste;
 pub use vm::Vm;
 
 /// Struct types library name.
