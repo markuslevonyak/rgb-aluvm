@@ -76,7 +76,6 @@ curve25519 = [
 ]
 serde = [
     "serde_crate",
-    "amplify/serde",
     "std",
     "rgb-strict-encoding/serde",
 ]
@@ -92,3 +91,7 @@ wasm-bindgen-test = "0.3"
 
 [package.metadata.docs.rs]
 features = ["all"]
+
+[patch.crates-io]
+rgb-strict-encoding = { git = "https://github.com/rgb-protocol/rgb-strict-encoding", rev = "7feb0f2" }
+rgb-strict-types = { git = "https://github.com/rgb-protocol/rgb-strict-types", rev = "8dfd921" }

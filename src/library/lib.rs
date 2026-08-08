@@ -68,6 +68,7 @@ pub const LIB_ID_TAG: [u8; 32] = *b"urn:ubideco:aluvm:lib:v01#230304";
 pub struct LibId(
     #[from]
     #[from([u8; 32])]
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::byte_array"))]
     Bytes32,
 );
 impl DefaultBasedStrictDumb for LibId {}
@@ -133,8 +134,10 @@ pub struct Lib {
     /// ISA segment
     pub isae: IsaSeg,
     /// Code segment
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub code: SmallBlob,
     /// Data segment
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
     pub data: SmallBlob,
     /// Libs segment
     pub libs: LibSeg,

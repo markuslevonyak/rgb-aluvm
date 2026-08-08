@@ -104,7 +104,10 @@ impl_ident_subtype!(IsaName);
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate", transparent)
 )]
-pub struct IsaSeg(Confined<BTreeSet<IsaName>, 0, ISAE_SEGMENT_MAX_COUNT>);
+pub struct IsaSeg(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
+    Confined<BTreeSet<IsaName>, 0, ISAE_SEGMENT_MAX_COUNT>,
+);
 impl DefaultBasedStrictDumb for IsaSeg {}
 
 impl IsaSeg {
@@ -199,7 +202,10 @@ impl FromStr for IsaSeg {
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate", transparent)
 )]
-pub struct LibSeg(Confined<BTreeSet<LibId>, 0, LIBS_SEGMENT_MAX_COUNT>);
+pub struct LibSeg(
+    #[cfg_attr(feature = "serde", serde(with = "strict_encoding::serde_helpers::confined"))]
+    Confined<BTreeSet<LibId>, 0, LIBS_SEGMENT_MAX_COUNT>,
+);
 impl DefaultBasedStrictDumb for LibSeg {}
 
 impl LibSeg {
