@@ -1508,7 +1508,7 @@ impl InstructionSet for Secp256k1Op {
 
     #[cfg(feature = "secp256k1")]
     fn exec(&self, regs: &mut CoreRegs, _site: LibSite, _: &()) -> ExecStep {
-        use secp256k1::{PublicKey, SecretKey, SECP256K1};
+        use secp256k1::{PublicKey, SecretKey};
 
         match self {
             Secp256k1Op::Gen(src, dst) => {
@@ -1519,9 +1519,9 @@ impl InstructionSet for Secp256k1Op {
                         // little endian to big endian
                         src.reverse();
                         let key_bytes: [u8; 32] = src.try_into().ok()?;
-                        SecretKey::from_byte_array(key_bytes).ok()
+                        SecretKey::from_secret_bytes(key_bytes).ok()
                     })
-                    .map(|sk| PublicKey::from_secret_key(SECP256K1, &sk))
+                    .map(|sk| PublicKey::from_secret_key(&sk))
                     .as_ref()
                     .map(PublicKey::serialize_uncompressed)
                     .map(|pk| Number::from_slice(&pk[1..]));
@@ -1545,7 +1545,7 @@ impl InstructionSet for Secp256k1Op {
                         let mut buf = [0u8; 32];
                         buf.copy_from_slice(scal.as_ref());
                         let scal = secp256k1::Scalar::from_le_bytes(buf).ok()?;
-                        pk.mul_tweak(SECP256K1, &scal).ok()
+                        pk.mul_tweak(&scal).ok()
                     })
                     .as_ref()
                     .map(PublicKey::serialize_uncompressed)
@@ -1583,7 +1583,7 @@ impl InstructionSet for Secp256k1Op {
                         pk[1..].copy_from_slice(&val[..]);
                         PublicKey::from_slice(&pk).ok()
                     })
-                    .map(|pk| pk.negate(SECP256K1))
+                    .map(PublicKey::negate)
                     .as_ref()
                     .map(PublicKey::serialize_uncompressed)
                     .map(|pk| Number::from_slice(&pk[1..]));
