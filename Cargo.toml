@@ -9,7 +9,6 @@ categories = ["no-std", "embedded", "compilers", "cryptography", "emulators"]
 rust-version = "1.85.0"
 edition = "2021"
 license = "Apache-2.0"
-readme = "README.md"
 exclude = [".github"]
 
 [lib]
