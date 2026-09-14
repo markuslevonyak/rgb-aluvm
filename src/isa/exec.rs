@@ -34,8 +34,8 @@ use core::ops::{BitAnd, BitOr, BitXor, Neg, Rem, Shl, Shr};
 use sha2::Digest;
 
 use super::{
-    ArithmeticOp, BitwiseOp, Bytecode, BytesOp, CmpOp, ControlFlowOp, Curve25519Op, DigestOp,
-    Instr, MoveOp, PutOp, ReservedOp, Secp256k1Op,
+    ArithmeticOp, BitwiseOp, Bytecode, BytesOp, CmpOp, ControlFlowOp, DigestOp, Instr, MoveOp,
+    PutOp, ReservedOp, Secp256k1Op,
 };
 use crate::data::{ByteStr, MaybeNumber, Number, NumberLayout};
 use crate::isa::{ExtendFlag, FloatEqFlag, IntFlags, MergeFlag, NoneEqFlag, SignFlag};
@@ -128,7 +128,6 @@ where Extension: InstructionSet
         let mut set = IsaSeg::with(constants::ISA_ID_ALU);
         set.extend(DigestOp::isa_ids()).expect("hardcoded");
         set.extend(Secp256k1Op::isa_ids()).expect("hardcoded");
-        set.extend(Curve25519Op::isa_ids()).expect("hardcoded");
         set.extend(Extension::isa_ids()).expect("hardcoded");
         set
     }
@@ -145,8 +144,6 @@ where Extension: InstructionSet
             Instr::Digest(instr) => instr.src_regs(),
             #[cfg(feature = "secp256k1")]
             Instr::Secp256k1(instr) => instr.src_regs(),
-            #[cfg(feature = "curve25519")]
-            Instr::Curve25519(instr) => instr.src_regs(),
             Instr::ExtensionCodes(instr) => instr.src_regs(),
             Instr::ReservedInstruction(instr) => instr.src_regs(),
             Instr::Nop => BTreeSet::new(),
@@ -165,8 +162,6 @@ where Extension: InstructionSet
             Instr::Digest(instr) => instr.dst_regs(),
             #[cfg(feature = "secp256k1")]
             Instr::Secp256k1(instr) => instr.dst_regs(),
-            #[cfg(feature = "curve25519")]
-            Instr::Curve25519(instr) => instr.dst_regs(),
             Instr::ExtensionCodes(instr) => instr.dst_regs(),
             Instr::ReservedInstruction(instr) => instr.dst_regs(),
             Instr::Nop => BTreeSet::new(),
@@ -185,8 +180,6 @@ where Extension: InstructionSet
             Instr::Digest(instr) => instr.complexity(),
             #[cfg(feature = "secp256k1")]
             Instr::Secp256k1(instr) => instr.complexity(),
-            #[cfg(feature = "curve25519")]
-            Instr::Curve25519(instr) => instr.complexity(),
             Instr::ExtensionCodes(instr) => instr.complexity(),
             Instr::ReservedInstruction(instr) => instr.complexity(),
             Instr::Nop => 1,
@@ -206,8 +199,6 @@ where Extension: InstructionSet
             Instr::Digest(instr) => instr.exec(regs, site, &()),
             #[cfg(feature = "secp256k1")]
             Instr::Secp256k1(instr) => instr.exec(regs, site, &()),
-            #[cfg(feature = "curve25519")]
-            Instr::Curve25519(instr) => instr.exec(regs, site, &()),
             Instr::ExtensionCodes(instr) => instr.exec(regs, site, ctx),
             Instr::ReservedInstruction(_) => ControlFlowOp::Fail.exec(regs, site, &()),
             Instr::Nop => ExecStep::Next,
@@ -1594,68 +1585,6 @@ impl InstructionSet for Secp256k1Op {
     }
 }
 
-impl InstructionSet for Curve25519Op {
-    type Context<'ctx> = ();
-
-    #[cfg(not(feature = "curve25519"))]
-    #[inline]
-    fn isa_ids() -> IsaSeg { IsaSeg::default() }
-
-    #[cfg(feature = "curve25519")]
-    #[inline]
-    fn isa_ids() -> IsaSeg { IsaSeg::with(constants::ISA_ID_ED25519) }
-
-    fn src_regs(&self) -> BTreeSet<Reg> {
-        match self {
-            Curve25519Op::Gen(src, _dst) => {
-                bset![Reg::R(RegR::R256, *src)]
-            }
-            Curve25519Op::Mul(RegBlockAR::A, scal, src, _dst) => {
-                bset![Reg::A(RegA::A256, *scal), Reg::R(RegR::R512, *src)]
-            }
-            Curve25519Op::Mul(RegBlockAR::R, scal, src, _dst) => {
-                bset![Reg::R(RegR::R256, *scal), Reg::R(RegR::R512, *src)]
-            }
-            Curve25519Op::Add(src1, src2, _dst, _) => {
-                bset![Reg::R(RegR::R512, *src1), Reg::new(RegR::R512, *src2)]
-            }
-            Curve25519Op::Neg(src, _dst) => {
-                bset![Reg::R(RegR::R512, *src)]
-            }
-        }
-    }
-
-    fn dst_regs(&self) -> BTreeSet<Reg> {
-        match self {
-            Curve25519Op::Gen(_src, dst) => {
-                bset![Reg::new(RegR::R512, *dst)]
-            }
-            Curve25519Op::Mul(_, _, _src, dst) => {
-                bset![Reg::R(RegR::R512, *dst)]
-            }
-            Curve25519Op::Add(_src1, _src2, dst, _) => {
-                bset![Reg::new(RegR::R512, *dst)]
-            }
-            Curve25519Op::Neg(_src, dst) => {
-                bset![Reg::new(RegR::R512, *dst)]
-            }
-        }
-    }
-
-    #[inline]
-    fn complexity(&self) -> u64 { 1000 }
-
-    #[cfg(not(feature = "curve25519"))]
-    fn exec(&self, _: &mut CoreRegs, _: LibSite, _: &()) -> ExecStep {
-        unimplemented!("AluVM runtime compiled without support for Curve25519 instructions")
-    }
-
-    #[cfg(feature = "curve25519")]
-    fn exec(&self, _regs: &mut CoreRegs, _site: LibSite, _: &()) -> ExecStep {
-        todo!("implement Curve256 operations")
-    }
-}
-
 impl InstructionSet for ReservedOp {
     type Context<'ctx> = ();
 
@@ -1936,186 +1865,4 @@ mod tests {
         );
         assert!(register.st0);
     }
-
-    /* TODO: Enable after curve25519 re-implementation
-    #[test]
-    #[cfg(feature = "curve25519")]
-    fn curve25519_mul_test() {
-        let mut register = CoreRegs::default();
-        let lib_site = LibSite::default();
-        PutOp::PutR(RegR::R256, Reg32::Reg0, MaybeNumber::from(2u8).into()).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        PutOp::PutR(RegR::R256, Reg32::Reg1, MaybeNumber::from(3u8).into()).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        PutOp::PutR(RegR::R256, Reg32::Reg2, MaybeNumber::from(6u8).into()).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        Curve25519Op::Gen(Reg32::Reg0, Reg8::Reg0).exec(&mut register, lib_site, &());
-        Curve25519Op::Mul(RegBlockAR::R, Reg32::Reg1, Reg32::Reg0, Reg32::Reg1).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        Curve25519Op::Gen(Reg32::Reg2, Reg8::Reg2).exec(&mut register, lib_site, &());
-        CmpOp::EqR(NoneEqFlag::NonEqual, RegR::R256, Reg32::Reg1, Reg32::Reg2).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        assert!(register.st0);
-        CmpOp::EqR(NoneEqFlag::NonEqual, RegR::R256, Reg32::Reg0, Reg32::Reg2).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        assert!(!register.st0);
-    }
-
-    #[test]
-    #[cfg(feature = "curve25519")]
-    fn curve25519_add_test() {
-        let mut register = CoreRegs::default();
-        let lib_site = LibSite::default();
-        PutOp::PutR(RegR::R256, Reg32::Reg0, MaybeNumber::from(600u16).into()).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        PutOp::PutR(RegR::R256, Reg32::Reg1, MaybeNumber::from(1200u16).into()).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        PutOp::PutR(RegR::R256, Reg32::Reg2, MaybeNumber::from(1800u16).into()).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        Curve25519Op::Gen(Reg32::Reg0, Reg8::Reg0).exec(&mut register, lib_site, &());
-        Curve25519Op::Gen(Reg32::Reg1, Reg8::Reg1).exec(&mut register, lib_site, &());
-        Curve25519Op::Gen(Reg32::Reg2, Reg8::Reg2).exec(&mut register, lib_site, &());
-        Curve25519Op::Add(Reg32::Reg0, Reg32::Reg1, Reg32::Reg3, false).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        CmpOp::EqR(NoneEqFlag::NonEqual, RegR::R256, Reg32::Reg2, Reg32::Reg3).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        assert!(register.st0);
-    }
-
-    #[test]
-    #[cfg(feature = "curve25519")]
-    fn curve25519_add_overflow_test() {
-        let mut register = CoreRegs::default();
-        let lib_site = LibSite::default();
-        let l_plus_two_bytes: [u8; 32] = [
-            0xef, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9,
-            0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x10,
-        ];
-        PutOp::PutR(
-            RegR::R256,
-            Reg32::Reg0,
-            MaybeNumber::from(Number::from_slice(l_plus_two_bytes)).into(),
-        )
-        .exec(&mut register, lib_site, &());
-        PutOp::PutR(RegR::R256, Reg32::Reg1, MaybeNumber::from(1u8).into()).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        PutOp::PutR(RegR::R256, Reg32::Reg2, MaybeNumber::from(3u8).into()).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        Curve25519Op::Gen(Reg32::Reg0, Reg8::Reg7).exec(&mut register, lib_site, &());
-        Curve25519Op::Gen(Reg32::Reg1, Reg8::Reg1).exec(&mut register, lib_site, &());
-        Curve25519Op::Gen(Reg32::Reg2, Reg8::Reg2).exec(&mut register, lib_site, &());
-        Curve25519Op::Add(Reg32::Reg7, Reg32::Reg1, Reg32::Reg3, false).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        assert!(!register.st0);
-        ControlFlowOp::Succ.exec(&mut register, lib_site, &());
-        Curve25519Op::Add(Reg32::Reg0, Reg32::Reg1, Reg32::Reg3, true).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        assert!(register.st0);
-        CmpOp::EqR(NoneEqFlag::NonEqual, RegR::R256, Reg32::Reg2, Reg32::Reg3).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        assert!(register.st0);
-    }
-
-    #[test]
-    #[cfg(feature = "curve25519")]
-    fn curve25519_neg_test() {
-        let mut register = CoreRegs::default();
-        let lib_site = LibSite::default();
-        PutOp::PutR(RegR::R256, Reg32::Reg0, MaybeNumber::from(1u8).into()).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        Curve25519Op::Gen(Reg32::Reg0, Reg8::Reg0).exec(&mut register, lib_site, &());
-        Curve25519Op::Neg(Reg32::Reg0, Reg8::Reg1).exec(&mut register, lib_site, &());
-        Curve25519Op::Neg(Reg32::Reg1, Reg8::Reg2).exec(&mut register, lib_site, &());
-        CmpOp::EqR(NoneEqFlag::NonEqual, RegR::R256, Reg32::Reg0, Reg32::Reg1).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        assert!(!register.st0);
-        ControlFlowOp::Succ.exec(&mut register, lib_site, &());
-        assert!(register.st0);
-        CmpOp::EqR(NoneEqFlag::NonEqual, RegR::R256, Reg32::Reg0, Reg32::Reg2).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        assert!(register.st0);
-        PutOp::PutR(RegR::R256, Reg32::Reg4, MaybeNumber::from(5u8).into()).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        PutOp::PutR(RegR::R256, Reg32::Reg5, MaybeNumber::from(6u8).into()).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        Curve25519Op::Gen(Reg32::Reg4, Reg8::Reg4).exec(&mut register, lib_site, &());
-        Curve25519Op::Gen(Reg32::Reg5, Reg8::Reg5).exec(&mut register, lib_site, &());
-        // -G + 6G
-        Curve25519Op::Add(Reg32::Reg1, Reg32::Reg5, Reg32::Reg6, true).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        CmpOp::EqR(NoneEqFlag::NonEqual, RegR::R256, Reg32::Reg4, Reg32::Reg6).exec(
-            &mut register,
-            lib_site,
-            &(),
-        );
-        assert!(register.st0);
-    }
-     */
 }

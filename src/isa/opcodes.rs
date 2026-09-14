@@ -128,13 +128,6 @@ pub const INSTR_SECP_MUL: u8 = 0b10_001_001;
 pub const INSTR_SECP_ADD: u8 = 0b10_001_010;
 pub const INSTR_SECP_NEG: u8 = 0b10_001_011;
 
-// ### Curve25519 operations (ED25519)
-
-pub const INSTR_ED_GEN: u8 = 0b10_001_100;
-pub const INSTR_ED_MUL: u8 = 0b10_001_101;
-pub const INSTR_ED_ADD: u8 = 0b10_001_110;
-pub const INSTR_ED_NEG: u8 = 0b10_001_111;
-
 // Opcodes with may be used by ISA extensions
 pub const INSTR_ISAE_FROM: u8 = 0b10_000_000;
 pub const INSTR_ISAE_TO: u8 = 0b11_111_110;

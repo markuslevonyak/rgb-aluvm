@@ -48,7 +48,6 @@ pub const ISA_ID_MAX_LEN: usize = 8;
 pub const ISA_ID_ALU: &str = "ALU";
 pub const ISA_ID_BPDIGEST: &str = "BPDIGEST";
 pub const ISA_ID_SECP256K: &str = "SECP256K";
-pub const ISA_ID_ED25519: &str = "ED25519";
 
 pub const ISA_ID_ALURE: &str = "ALURE";
 pub const ISA_ID_SIMD: &str = "SIMD";

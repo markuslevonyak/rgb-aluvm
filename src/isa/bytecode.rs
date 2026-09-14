@@ -33,8 +33,8 @@ use amplify::num::{u1, u2, u3, u5};
 
 use super::opcodes::*;
 use super::{
-    ArithmeticOp, BitwiseOp, BytesOp, CmpOp, ControlFlowOp, Curve25519Op, DigestOp, Instr,
-    InstructionSet, MoveOp, PutOp, ReservedOp, Secp256k1Op,
+    ArithmeticOp, BitwiseOp, BytesOp, CmpOp, ControlFlowOp, DigestOp, Instr, InstructionSet,
+    MoveOp, PutOp, ReservedOp, Secp256k1Op,
 };
 use crate::data::{ByteStr, MaybeNumber};
 use crate::library::{CodeEofError, LibSite, Read, Write, WriteError};
@@ -116,8 +116,6 @@ where Extension: InstructionSet
             Instr::Digest(instr) => instr.instr_byte(),
             #[cfg(feature = "secp256k1")]
             Instr::Secp256k1(instr) => instr.instr_byte(),
-            #[cfg(feature = "curve25519")]
-            Instr::Curve25519(instr) => instr.instr_byte(),
             Instr::ExtensionCodes(instr) => instr.instr_byte(),
             Instr::ReservedInstruction(instr) => instr.instr_byte(),
             Instr::Nop => 1,
@@ -136,8 +134,6 @@ where Extension: InstructionSet
             Instr::Digest(instr) => instr.call_site(),
             #[cfg(feature = "secp256k1")]
             Instr::Secp256k1(instr) => instr.call_site(),
-            #[cfg(feature = "curve25519")]
-            Instr::Curve25519(instr) => instr.call_site(),
             Instr::ExtensionCodes(instr) => instr.call_site(),
             Instr::ReservedInstruction(instr) => instr.call_site(),
             Instr::Nop => None,
@@ -157,8 +153,6 @@ where Extension: InstructionSet
             Instr::Digest(instr) => instr.encode_args(writer),
             #[cfg(feature = "secp256k1")]
             Instr::Secp256k1(instr) => instr.encode_args(writer),
-            #[cfg(feature = "curve25519")]
-            Instr::Curve25519(instr) => instr.encode_args(writer),
             Instr::ExtensionCodes(instr) => instr.encode_args(writer),
             Instr::ReservedInstruction(instr) => instr.encode_args(writer),
             Instr::Nop => Ok(()),
@@ -190,10 +184,6 @@ where Extension: InstructionSet
             #[cfg(feature = "secp256k1")]
             instr if Secp256k1Op::instr_range().contains(&instr) => {
                 Instr::Secp256k1(Secp256k1Op::decode(reader)?)
-            }
-            #[cfg(feature = "curve25519")]
-            instr if Curve25519Op::instr_range().contains(&instr) => {
-                Instr::Curve25519(Curve25519Op::decode(reader)?)
             }
             INSTR_RESV_FROM..=INSTR_RESV_TO => {
                 Instr::ReservedInstruction(ReservedOp::decode(reader)?)
@@ -1231,68 +1221,6 @@ impl Bytecode for Secp256k1Op {
             INSTR_SECP_ADD => Self::Add(reader.read_u5()?.into(), reader.read_u3()?.into()),
             INSTR_SECP_NEG => Self::Neg(reader.read_u5()?.into(), reader.read_u3()?.into()),
             x => unreachable!("instruction {:#010b} classified as Secp256k1 curve operation", x),
-        })
-    }
-}
-
-impl Bytecode for Curve25519Op {
-    #[inline]
-    fn instr_range() -> RangeInclusive<u8> { INSTR_ED_GEN..=INSTR_ED_NEG }
-
-    fn instr_byte(&self) -> u8 {
-        match self {
-            Curve25519Op::Gen(_, _) => INSTR_ED_GEN,
-            Curve25519Op::Mul(_, _, _, _) => INSTR_ED_MUL,
-            Curve25519Op::Add(_, _, _, _) => INSTR_ED_ADD,
-            Curve25519Op::Neg(_, _) => INSTR_ED_NEG,
-        }
-    }
-
-    fn encode_args<W>(&self, writer: &mut W) -> Result<(), BytecodeError>
-    where W: Write {
-        match self {
-            Curve25519Op::Gen(src, dst) => {
-                writer.write_u5(src)?;
-                writer.write_u3(dst)?;
-            }
-            Curve25519Op::Mul(reg, scal, src, dst) => {
-                writer.write_bool(*reg == RegBlockAR::A)?;
-                writer.write_u5(scal)?;
-                writer.write_u5(src)?;
-                writer.write_u5(dst)?;
-            }
-            Curve25519Op::Add(src1, src2, dst, overflow) => {
-                writer.write_u5(src1)?;
-                writer.write_u5(src2)?;
-                writer.write_u5(dst)?;
-                writer.write_bool(*overflow)?;
-            }
-            Curve25519Op::Neg(src, dst) => {
-                writer.write_u5(src)?;
-                writer.write_u3(dst)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn decode<R>(reader: &mut R) -> Result<Self, CodeEofError>
-    where R: Read {
-        Ok(match reader.read_u8()? {
-            INSTR_ED_GEN => Self::Gen(reader.read_u5()?.into(), reader.read_u3()?.into()),
-            INSTR_ED_MUL => Self::Mul(
-                if reader.read_bool()? { RegBlockAR::A } else { RegBlockAR::R },
-                reader.read_u5()?.into(),
-                reader.read_u5()?.into(),
-                reader.read_u5()?.into(),
-            ),
-            INSTR_ED_ADD => Self::Add(
-                reader.read_u5()?.into(),
-                reader.read_u5()?.into(),
-                reader.read_u5()?.into(),
-                reader.read_bool()?,
-            ),
-            INSTR_ED_NEG => Self::Neg(reader.read_u5()?.into(), reader.read_u3()?.into()),
-            x => unreachable!("instruction {:#010b} classified as Curve25519 operation", x),
         })
     }
 }

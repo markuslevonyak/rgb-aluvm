@@ -84,11 +84,6 @@ where Extension: InstructionSet
     // 0b01_001_0**
     Secp256k1(Secp256k1Op),
 
-    #[cfg(feature = "curve25519")]
-    /// Operations on Curve25519 elliptic curve. See [`Curve25519Op`] for the details.
-    // 0b01_001_1**
-    Curve25519(Curve25519Op),
-
     /// Extension operations which can be provided by a host environment provided via generic
     /// parameter
     // 0b10_***_***
@@ -924,40 +919,5 @@ pub enum Secp256k1Op {
 
     /// Negates elliptic curve point
     #[display("secpneg r512{0},r512{1}")]
-    Neg(/** Register hilding EC point to negate */ Reg32, /** Destination register */ Reg8),
-}
-
-/// Operations on Curve25519 elliptic curve
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Display)]
-pub enum Curve25519Op {
-    /// Generates new elliptic curve point value saved into destination
-    /// register in `r512` set using scalar value from the source `r256`
-    /// register
-    #[display("edgen   r256{0},r256{1}")]
-    Gen(
-        /** Register containing scalar */ Reg32,
-        /** Destination register to put G * scalar */ Reg8,
-    ),
-
-    /// Multiplies elliptic curve point on a scalar
-    #[display("edmul   {0}256{1},r256{2},r256{3}")]
-    Mul(
-        /** Use `a` or `r` register as scalar source */ RegBlockAR,
-        /** Scalar register index */ Reg32,
-        /** Source `r` register index containing EC point */ Reg32,
-        /** Destination `r` register index */ Reg32,
-    ),
-
-    /// Adds two elliptic curve points
-    #[display("edadd   r512{0},r256{1},r256{2},{3}")]
-    Add(
-        /** Source 1 */ Reg32,
-        /** Source 2 */ Reg32,
-        /** Destination register */ Reg32,
-        /** Allow overflows */ bool,
-    ),
-
-    /// Negates elliptic curve point
-    #[display("edneg   r256{0},r256{1}")]
     Neg(/** Register hilding EC point to negate */ Reg32, /** Destination register */ Reg8),
 }

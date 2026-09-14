@@ -47,7 +47,6 @@ all = [
     "std",
     "log",
     "secp256k1",
-    "curve25519",
     "serde",
     "ascii-armor",
 ]
@@ -67,7 +66,6 @@ log = [
 alloc = [
     "amplify/alloc",
 ]
-curve25519 = []
 serde = [
     "serde_crate",
     "std",

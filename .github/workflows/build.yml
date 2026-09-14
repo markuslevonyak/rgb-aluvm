@@ -35,7 +35,6 @@ jobs:
           - log
           - ascii-armor
           - secp256k1
-          - curve25519
           - serde
           - stl
     steps:
@@ -52,7 +51,6 @@ jobs:
       matrix:
         feature:
           - secp256k1
-          - curve25519
     steps:
       - uses: actions/checkout@v6
       - uses: actions-rust-lang/setup-rust-toolchain@v1

@@ -40,8 +40,8 @@ pub use flags::{
     ParseFlagError, RoundingFlag, SignFlag, SplitFlag,
 };
 pub use instr::{
-    ArithmeticOp, BitwiseOp, BytesOp, CmpOp, ControlFlowOp, Curve25519Op, DigestOp, Instr, MoveOp,
-    PutOp, ReservedOp, Secp256k1Op,
+    ArithmeticOp, BitwiseOp, BytesOp, CmpOp, ControlFlowOp, DigestOp, Instr, MoveOp, PutOp,
+    ReservedOp, Secp256k1Op,
 };
 
 /// List of standardised ISA extensions.
@@ -65,10 +65,6 @@ pub enum Isa {
     /// Operations on Secp256k1 curve
     #[display("SECP256")]
     Secp256k1,
-
-    /// Operations on Curve25519
-    #[display("ED25519")]
-    Curve25519,
 
     /// ALU runtime extensions
     #[display("ALURE")]
@@ -97,13 +93,12 @@ pub enum Isa {
 
 impl Isa {
     /// Enumerates all ISA extension variants
-    pub const fn all() -> [Isa; 11] {
+    pub const fn all() -> [Isa; 10] {
         [
             Isa::Alu,
             Isa::Float,
             Isa::BpDigest,
             Isa::Secp256k1,
-            Isa::Curve25519,
             Isa::AluRe,
             Isa::Bp,
             Isa::Rgb,
